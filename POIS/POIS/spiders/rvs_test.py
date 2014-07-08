@@ -1,15 +1,28 @@
 from scrapy.spider import Spider
 from scrapy.selector import Selector
+from scrapy.http import Request
 from POIS.items import PoisItem
 import re
+import urlparse
 
 class RvsSpider(Spider):
     name = "rvs"
     allowed_domains = ["raadvst-consetat.be"]
-    start_urls = ["http://www.raadvst-consetat.be/?lang=fr&page=hearing_page1"]
-
+    start_urls = ["http://www.raadvst-consetat.be/?lang=fr&page=hearing"]
 
     def parse(self, response):
+        hxs  = Selector(response)
+        urls = hxs.xpath("//td[@class='c']/a/@href").extract()
+
+        UrlMask = '^.*hearing_page.*$'
+        UrlRe   = re.compile(UrlMask)
+        for url in urls:
+            if UrlRe.match(url):
+                url = urlparse.urljoin(response.url, url)
+                print 'Found hearing url: %s' % url
+                yield Request(url, callback=self.parseHearing)
+
+    def parseHearing(self, response):
         hxs = Selector(response)
         AudMask = '^G/A (?P<role>[0-9\.]{1,})/(?P<room>[VIX]{1,})-(?P<room_number>[0-9]*), (?P<applicant>[^(]+?)(\((?P<app_lawyer>[^)]+)\))? contre (?P<opposer>[^(]+?)(\((?P<opp_lawyer>[^)]+)\))?$'
         AudReObj = re.compile(AudMask)
